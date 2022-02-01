@@ -137,7 +137,7 @@ namespace adkuDBInterface
                 if (_connType == ConnectionTypes.MSSQL && script.ToUpper().StartsWith("--MSSQL")) return script;
                 else if (_connType == ConnectionTypes.PG && script.ToUpper().StartsWith("--PG")) return script;
             }
-            return "";
+            return text;
         }
 
 
@@ -253,15 +253,14 @@ namespace adkuDBInterface
                             //IDictionary<string, object> readerItem = new Dictionary<string, object>();
                             for (int i = 0; i < reader.FieldCount; i++)
                             {
-                                /*  string name = reader.GetName(i);
-                                  if (name == "")
-                                  {
-                                      name = "field" + i.ToString();
-                                  }
-                                  while (readerItem.ContainsKey(name)) name += "_";
-
-                                  readerItem.Add(name, reader.IsDBNull(i) ? null : reader[i]);*/
-                                readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
+                            if (!response.fieldNames.ContainsKey(i))
+                            {
+                                string name = reader.GetName(i);
+                                if (name == "") name = "field" + i.ToString();
+                                while (response.fieldNames.Values.Contains(name)) name += "_";
+                                response.fieldNames.Add(i, name);
+                            }
+                            readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
                             }
 
 
@@ -301,22 +300,20 @@ namespace adkuDBInterface
                 {
                     try
                     {
-                        while (reader.Read())
+                    Dictionary<string, int> fields = new Dictionary<string, int>();
+                    while (reader.Read())
+                    {
+                        // результут записываем в виде списка объектов { поле: значение }
+                        // поле - название колонки, анонимная колонка получает название field + номер колонки
+                        IDictionary<int, SQLObject> readerItem = new Dictionary<int, SQLObject>();
+                        for (int i = 0; i < reader.FieldCount; i++)
                         {
-                            // результут записываем в виде списка объектов { поле: значение }
-                            // поле - название колонки, анонимная колонка получает название field + номер колонки
-                            IDictionary<int, SQLObject> readerItem = new Dictionary<int, SQLObject>();
-                            for (int i = 0; i < reader.FieldCount; i++)
-                            {
-
-                                /*string name = reader.GetName(i);
-                                if (name == "")
-                                {
-                                    name = "field" + i.ToString();
-                                }
-                                while (readerItem.ContainsKey(name)) name += "_";
-
-                                readerItem.Add(name, reader.IsDBNull(i) ? null : reader[i]);*/
+                            if (!response.fieldNames.ContainsKey(i)) {
+                                string name = reader.GetName(i);
+                                if (name == "") name = "field" + i.ToString();
+                                while (response.fieldNames.Values.Contains(name)) name += "_";
+                                response.fieldNames.Add(i, name);
+                            }
                                 readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
                             }
                             response.data.Add(readerItem);
