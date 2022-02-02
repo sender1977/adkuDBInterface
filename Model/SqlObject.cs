@@ -4,7 +4,9 @@ namespace adkuDBInterface.Model
 {
     public class SQLObject
     {
+
         private object _value;
+        public object Value {get => _value; }
         public SQLObject(object value)
         {
             _value = value;
