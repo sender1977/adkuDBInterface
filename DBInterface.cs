@@ -45,7 +45,7 @@ namespace adkuDBInterface
 
             ~DBConnection()
             {
-                Close();
+               // Close();
                 _pgConn = null;
                 _msConn = null;
             }
@@ -126,8 +126,8 @@ namespace adkuDBInterface
 
             private void Close()
             {
-                if (_pgConn != null) _pgConn.Close();
-                if (_msConn != null) _msConn.Close();
+                if (_pgConn != null && _pgConn.State==ConnectionState.Open) _pgConn.Close();
+                if (_msConn != null && _msConn.State==ConnectionState.Open) _msConn.Close();
 
             }
         private async Task<string> ReadScript(string fileName) {
