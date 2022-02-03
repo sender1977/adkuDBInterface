@@ -169,8 +169,14 @@ namespace adkuDBInterface
                 }
             }
 
+        public async Task<SqlExecuteListResponse> ExecuteAndGetList(string sql)
+        {
+            if (_connType == ConnectionTypes.MSSQL) return await msExecuteAndGetList(sql);
+            else if (_connType == ConnectionTypes.PG) return await pgExecuteAndGetList(sql);
+            else return new SqlExecuteListResponse();
+        }
 
-            public async Task<SqlExecuteListResponse> Execute(T sql, Dictionary<string, string> paramList)
+        public async Task<SqlExecuteListResponse> Execute(T sql, Dictionary<string, string> paramList)
             {
                 if (_connType == ConnectionTypes.MSSQL) return await msExecute(prepareSql(_sqlConst[sql].sql_mssql, paramList));
                 else if (_connType == ConnectionTypes.PG) return await pgExecute(prepareSql(_sqlConst[sql].sql_pg, paramList));
@@ -199,7 +205,12 @@ namespace adkuDBInterface
                 return errRes;
             }
         }
-
+        public async Task<SqlExecuteListResponse> Execute(string sql)
+        {
+            if (_connType == ConnectionTypes.MSSQL) return await msExecute(sql);
+            else if (_connType == ConnectionTypes.PG) return await pgExecute(sql);
+            else return new SqlExecuteListResponse();
+        }
 
         public async Task<string> BulkSave(Queue q, string tab)
             {
