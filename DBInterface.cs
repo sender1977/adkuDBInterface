@@ -27,6 +27,7 @@ namespace adkuDBInterface
             private SortedList<string, PGDependency> _pgDependencies = new SortedList<string, PGDependency>();
             private SortedList<string, MSSQLDependency> _msDependencies = new SortedList<string, MSSQLDependency>();
 
+            public ConnectionTypes ConnectionType { get => getConnectionType(); }
 
             public DBConnection(string connectionString, SortedList<T, SqlString> sqlConst)
             {
@@ -130,14 +131,23 @@ namespace adkuDBInterface
                 if (_msConn != null && _msConn.State==ConnectionState.Open) _msConn.Close();
 
             }
-        private async Task<string> ReadScript(string fileName) {
-            string text = await System.IO.File.ReadAllTextAsync(fileName);
+        private string RetrievePartFromScriptByServerType(string text) {
             foreach (string script in text.Split("--@@"))
             {
                 if (_connType == ConnectionTypes.MSSQL && script.ToUpper().StartsWith("--MSSQL")) return script;
                 else if (_connType == ConnectionTypes.PG && script.ToUpper().StartsWith("--PG")) return script;
             }
             return text;
+        }
+        private async Task<string> ReadScript(string fileName) {
+            string text = await System.IO.File.ReadAllTextAsync(fileName);
+            return RetrievePartFromScriptByServerType(text);
+            /*foreach (string script in text.Split("--@@"))
+            {
+                if (_connType == ConnectionTypes.MSSQL && script.ToUpper().StartsWith("--MSSQL")) return script;
+                else if (_connType == ConnectionTypes.PG && script.ToUpper().StartsWith("--PG")) return script;
+            }
+            return text;*/
         }
 
 
@@ -147,30 +157,37 @@ namespace adkuDBInterface
                 else if (_connType == ConnectionTypes.PG) return await pgExecuteAndGetList(prepareSql(_sqlConst[sql].sql_pg, paramList));
                 else return new SqlExecuteListResponse();
             }
-            public async Task<SqlExecuteListResponse> ExecuteAndGetList(List<SQLScriptItem<T>> script)
+        public async Task<SqlExecuteListResponse> ExecuteAndGetList(List<SQLScriptItem<T>> script)
+        {
+            if (_connType == ConnectionTypes.MSSQL) return await msExecuteAndGetList(prepareSqlScript(script));
+            else if (_connType == ConnectionTypes.PG) return await pgExecuteAndGetList(prepareSqlScript(script));
+            else return new SqlExecuteListResponse();
+        }
+        public async Task<SqlExecuteListResponse> ExecuteAndGetList(string fileName, Dictionary<string, string> paramList)
+        {
+            try
             {
-                if (_connType == ConnectionTypes.MSSQL) return await msExecuteAndGetList(prepareSqlScript(script));
-                else if (_connType == ConnectionTypes.PG) return await pgExecuteAndGetList(prepareSqlScript(script));
+                var script = await ReadScript(fileName);
+                if (_connType == ConnectionTypes.MSSQL) return await msExecuteAndGetList(prepareSql(script, paramList));
+                else if (_connType == ConnectionTypes.PG) return await pgExecuteAndGetList(prepareSql(script, paramList));
                 else return new SqlExecuteListResponse();
             }
-            public async Task<SqlExecuteListResponse> ExecuteAndGetList(string fileName, Dictionary<string, string> paramList)
-            {
-                try
-                {
-                    var script = await ReadScript(fileName);
-                    if (_connType == ConnectionTypes.MSSQL) return await msExecuteAndGetList(prepareSql(script, paramList));
-                    else if (_connType == ConnectionTypes.PG) return await pgExecuteAndGetList(prepareSql(script, paramList));
-                    else return new SqlExecuteListResponse();
-                }
-                catch (Exception e) {
-                   var errRes= new SqlExecuteListResponse();
-                    errRes.errorText = e.Message;
-                    return errRes;
-                }
+            catch (Exception e) {
+                var errRes= new SqlExecuteListResponse();
+                errRes.errorText = e.Message;
+                return errRes;
             }
+        }
 
+        public async Task<SqlExecuteListResponse> ExecuteAndGetList(string sql)
+        {
+            var script = RetrievePartFromScriptByServerType(sql);
+            if (_connType == ConnectionTypes.MSSQL) return await msExecuteAndGetList(script);
+            else if (_connType == ConnectionTypes.PG) return await pgExecuteAndGetList(script);
+            else return new SqlExecuteListResponse();
+        }
 
-            public async Task<SqlExecuteListResponse> Execute(T sql, Dictionary<string, string> paramList)
+        public async Task<SqlExecuteListResponse> Execute(T sql, Dictionary<string, string> paramList)
             {
                 if (_connType == ConnectionTypes.MSSQL) return await msExecute(prepareSql(_sqlConst[sql].sql_mssql, paramList));
                 else if (_connType == ConnectionTypes.PG) return await pgExecute(prepareSql(_sqlConst[sql].sql_pg, paramList));
@@ -199,7 +216,13 @@ namespace adkuDBInterface
                 return errRes;
             }
         }
-
+        public async Task<SqlExecuteListResponse> Execute(string sql)
+        {
+            var script = RetrievePartFromScriptByServerType(sql);
+            if (_connType == ConnectionTypes.MSSQL) return await msExecute(script);
+            else if (_connType == ConnectionTypes.PG) return await pgExecute(script);
+            else return new SqlExecuteListResponse();
+        }
 
         public async Task<string> BulkSave(Queue q, string tab)
             {
