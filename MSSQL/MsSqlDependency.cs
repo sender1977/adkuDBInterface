@@ -23,6 +23,7 @@ namespace adkuDBInterface.MSSQL
 
         private void Watch()
         {
+            if (_connection.State!=System.Data.ConnectionState.Open)_connection.Open();
             using (SqlCommand command = new SqlCommand(_watchSQL, _connection))
             {
 

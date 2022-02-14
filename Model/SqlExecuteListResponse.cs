@@ -13,6 +13,7 @@ namespace adkuDBInterface.Model
 
         public IList<IDictionary<string, object>> getDataWithFields() {
             List<IDictionary<string, object>> result = new List<IDictionary<string, object>>();
+            if (data!=null)
             foreach (var row in data) {
                 Dictionary<string, object> newRow = new Dictionary<string, object>();
                 foreach (var key in row.Keys) {
