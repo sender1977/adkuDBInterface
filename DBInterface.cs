@@ -282,7 +282,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.ToString());
+                        response.SetError(ex.Message);
                     }
                 }
                 finally
@@ -339,7 +339,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.ToString());
+                        response.SetError(ex.Message);
                     }
                 }
                 finally
@@ -371,7 +371,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.ToString());
+                        response.SetError(ex.Message);
                     }
 
                     return response;
@@ -405,7 +405,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.ToString());
+                        response.SetError(ex.Message);
                     }
 
                     return response;
