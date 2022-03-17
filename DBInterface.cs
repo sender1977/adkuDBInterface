@@ -14,7 +14,6 @@ using adkuDBInterface.MSSQL;
 
 namespace adkuDBInterface
 {
-
     //"user id=sa;data source=srv-tm-ias\\sql2014;persist security info=True;initial catalog=npz1;password=1"
     //"Server=srv-tm-ias;Port=5432;Database=ADKU;User Id=postgres;Password=1;"
     public class DBConnection<T> where T : Enum
