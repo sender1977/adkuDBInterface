@@ -21,22 +21,35 @@ namespace adkuDBInterface.PG
         }
         private void Do()
         {
-            using (var conn = new NpgsqlConnection(_cs))
+            while (_state)
+            try
             {
-
-
-                Console.Out.WriteLine("Opening connection");
-                conn.Open();
-                conn.Notification += NotificationSupportHelper;
-
-                using (var com = new NpgsqlCommand("listen adku;", conn))
+                using (var conn = new NpgsqlConnection(_cs))
                 {
-                    com.ExecuteNonQuery();
 
+
+                    //Console.Out.WriteLine("Opening connection");
+                    conn.Open();
+                    conn.Notification += NotificationSupportHelper;
+
+                    using (var com = new NpgsqlCommand("listen adku;", conn))
+                    {
+                        com.ExecuteNonQuery();
+
+                    }
+                        try
+                        {
+                            while (_state)
+                                conn.Wait();   // Thread will block here
+                        }
+                        catch { 
+                        
+                        }
+                    conn.Notification -= NotificationSupportHelper;
                 }
-                while (_state)
-                    conn.Wait();   // Thread will block here
-                conn.Notification -= NotificationSupportHelper;
+            }
+            catch {
+                Thread.Sleep(300);
             }
         }
         private void startListening()
