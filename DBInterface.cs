@@ -299,6 +299,9 @@ namespace adkuDBInterface
             else return new SqlExecuteListResponse();*/
         }
 
+
+
+
         public async Task<SqlExecuteListResponse> Execute(List<SQLScriptItem<T>> script)
         {
             return await ExecuteInternal(_connType, prepareSqlScript(script));
@@ -578,7 +581,7 @@ namespace adkuDBInterface
                         cmd.CommandType = CommandType.Text;
                         cmd.CommandText = query;
                         reader = cmd.ExecuteReader();
-
+                        
                         Dictionary<string, int> fields = new Dictionary<string, int>();
                         while (reader.Read())
                         {
@@ -635,7 +638,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.Message);
+                            response.SetError(ex.Message);
                     }
 
                     return response;
@@ -677,6 +680,8 @@ namespace adkuDBInterface
                 }
             }
         }
+
+
 
         private async Task<SqlExecuteListResponse> msExecute(string query)
         {
@@ -745,6 +750,7 @@ namespace adkuDBInterface
                 }
             }
         }
+
 
         private async Task<String> pgBulkSave(Queue q, string tab)
         {
