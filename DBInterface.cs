@@ -141,7 +141,7 @@ namespace adkuDBInterface
         }
 
 
-        private string RetrievePartFromScriptByServerType(string text)
+        public string RetrievePartFromScriptByServerType(string text)
         {
             foreach (string script in text.Split("--@@"))
             {
@@ -403,47 +403,56 @@ namespace adkuDBInterface
                 NpgsqlDataReader reader = null;
                 try
                 {
-
                     try
                     {
-                        await _pgConn.OpenAsync();
 
-                        var cmd = new NpgsqlCommand(query, _pgConn);
-                        reader = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection);
-
-                        while (await reader.ReadAsync())
+                        try
                         {
-                            IDictionary<int, SQLObject> readerItem = new Dictionary<int, SQLObject>();
-                            // результут записываем в виде списка объектов { поле: значение }
-                            // поле - название колонки, анонимная колонка получает название field + номер колонки
-                            //IDictionary<string, object> readerItem = new Dictionary<string, object>();
-                            for (int i = 0; i < reader.FieldCount; i++)
+                            await _pgConn.OpenAsync();
+
+                            var cmd = new NpgsqlCommand(query, _pgConn);
+                            reader = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection);
+
+
+                            while (await reader.ReadAsync())
                             {
-                                if (!response.fieldNames.ContainsKey(i))
+                                IDictionary<int, SQLObject> readerItem = new Dictionary<int, SQLObject>();
+                                // результут записываем в виде списка объектов { поле: значение }
+                                // поле - название колонки, анонимная колонка получает название field + номер колонки
+                                //IDictionary<string, object> readerItem = new Dictionary<string, object>();
+                                for (int i = 0; i < reader.FieldCount; i++)
                                 {
-                                    string name = reader.GetName(i);
-                                    if (name == "") name = "field" + i.ToString();
-                                    while (response.fieldNames.Values.Contains(name)) name += "_";
-                                    response.fieldNames.Add(i, name);
+                                    if (!response.fieldNames.ContainsKey(i))
+                                    {
+                                        string name = reader.GetName(i);
+                                        if (name == "") name = "field" + i.ToString();
+                                        while (response.fieldNames.Values.Contains(name)) name += "_";
+                                        response.fieldNames.Add(i, name);
+                                    }
+                                    readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
                                 }
-                                readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
+
+
+                                response.data.Add(readerItem);
                             }
+                        }
+                        catch (Exception ex)
+                        {
+                            response.SetError(ex.Message, query);
 
-
-                            response.data.Add(readerItem);
                         }
                     }
-                    catch (Exception ex)
+                    finally
                     {
-                        response.SetError(ex.Message);
+                        if (reader != null) reader.Close();
+                        _pgConn.Close();
                     }
                 }
-                finally
+                catch (Exception ex)
                 {
-                    if (reader != null) reader.Close();
-                    _pgConn.Close();
+                    response.SetError(ex.Message, query);
+
                 }
-                // }
 
                 return response;
             }
@@ -457,6 +466,7 @@ namespace adkuDBInterface
 
                 SqlExecuteListResponse response = new SqlExecuteListResponse();
                 NpgsqlDataReader reader = null;
+                try { 
                 try
                 {
 
@@ -491,7 +501,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.Message);
+                        response.SetError(ex.Message, query);
                     }
                 }
                 finally
@@ -499,7 +509,12 @@ namespace adkuDBInterface
                     if (reader != null) reader.Close();
                     _pgConn.Close();
                 }
-                // }
+                }
+                catch (Exception ex)
+                {
+                    response.SetError(ex.Message, query);
+
+                }
 
                 return response;
             }
@@ -548,7 +563,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.Message);
+                        response.SetError(ex.Message, query);
                     }
                 }
                 finally
@@ -604,7 +619,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.Message);
+                        response.SetError(ex.Message, query);
                     }
                 }
                 finally
@@ -638,7 +653,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                            response.SetError(ex.Message);
+                            response.SetError(ex.Message, query);
                     }
 
                     return response;
@@ -669,7 +684,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.Message);
+                        response.SetError(ex.Message, query);
                     }
 
                     return response;
@@ -705,7 +720,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.Message);
+                        response.SetError(ex.Message, query);
                     }
 
                     return response;
@@ -739,7 +754,7 @@ namespace adkuDBInterface
                     }
                     catch (Exception ex)
                     {
-                        response.SetError(ex.Message);
+                        response.SetError(ex.Message, query);
                     }
 
                     return response;
@@ -803,9 +818,16 @@ namespace adkuDBInterface
             }
         }
 
-        private async Task<String> msBulkSave(Queue q, string tab)
+        string getRows (Queue q) {
+            StringBuilder s = new StringBuilder("\n");
+            foreach (LGFlatRecord rec in q) {
+                s.Append($"{rec.TypeObj}   {rec.IdObj}     {rec.Registr}   {rec.DT.ToOADate()} \n");
+            }
+            return s.ToString();
+        }
+        private async Task<String> msBulkSave(Queue q, string tab, int attempt = 0, string err="")
         {
-
+            Queue copy = (Queue)q.Clone();
             if (!String.IsNullOrEmpty(tab))
                 try
                 {
@@ -821,9 +843,31 @@ namespace adkuDBInterface
                 }
                 catch (Exception e)
                 {
-                    return e.Message;
+                    if (tab.ToLower().Contains("lgflat") && e.Message.ToLower().Contains("primary key") && attempt < 5)
+                    {
+                        Random rnd = new Random();
+                        //string[] fields = e.Message.Split(",");
+                        //int id = 0;
+                        //if (fields.Length > 1 && !int.TryParse(fields[1], out id)) id = 0;
+                        SortedList<string, List<LGFlatRecord>> all = new SortedList<string, List<LGFlatRecord>>();
+                        foreach (LGFlatRecord rec in copy)
+                        {   
+                            // корректируем 
+                            //if (rec.IdObj == id || id == 0) rec.DT = rec.DT.AddMilliseconds(rnd.Next(5, 20));
+                            string key = $"{rec.TypeObj}_{rec.IdObj}_{rec.Registr}";
+                            if (all.ContainsKey(key)) all[key].Add(rec); else all.Add(key, new List<LGFlatRecord> { rec });
+                        }
+                        
+                        foreach (List<LGFlatRecord> recs in all.Values)
+                            if (recs.Count > 1) foreach (LGFlatRecord rec in recs) rec.DT = rec.DT.AddMilliseconds(10 * (recs.IndexOf(rec) + 1));
+                            else recs[0].DT = recs[0].DT.AddMilliseconds(rnd.Next(5,20));
+
+                        return await msBulkSave(copy, tab, attempt + 1, e.Message);
+                    }
+                    else
+                        return e.Message + (tab.ToLower().Contains("lgflat") ? getRows(copy) : "") + $" попытка {attempt}";
                 }
-            return "";
+            return (attempt <= 3 ? "": $"Были проблемы с первичным ключом, но сохранение прошло с попытки {attempt} ошибка: {err}");
 
         }
 

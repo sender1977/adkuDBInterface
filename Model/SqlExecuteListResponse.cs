@@ -5,6 +5,7 @@ namespace adkuDBInterface.Model
 {
     public class SqlExecuteListResponse
     {
+        public string queryText { get; set; } = "";
         // текст ошибки
         public string errorText { get; set; } = "";
         // список загруженных данных, в формате { поле: значение }
@@ -29,9 +30,10 @@ namespace adkuDBInterface.Model
             return "{\"ss\":\"bb\"}";
         }
         // установка ошибки
-        public void SetError(string error)
+        public void SetError(string error, string query)
         {
             errorText = error;
+            queryText = query;
             // сброс данных
             data = null;
         }

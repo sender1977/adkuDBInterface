@@ -30,9 +30,11 @@ namespace adkuDBInterface.Model
 
         public LGFlatRecord(int aTypeObj, int aIdObj, DateTime aDT, int aRegistr, int aFlag = 3, int Size = 0)
         {
+            Random r = new Random();
+            
             this.TypeObj = aTypeObj;
             this.IdObj = aIdObj;
-            this.DT = aDT;
+            this.DT = aDT;//.Millisecond==0 ? aDT.AddMilliseconds(r.Next(0,200)) : aDT;
             this.Registr = aRegistr;
             this.Flag = aFlag;
             this.Data = new float [Size];
