@@ -12,6 +12,11 @@ namespace adkuDBInterface.Model
         public int Flag;
         public float[] Data;
         public Type getType() => this.GetType();
+        private float NormalizeFloat(float value) {
+            if (value > 1e38 || value < -1e38) return -32000;
+            else if (value < 1e-20 && value > -1e-20) return 0;
+            else return value;
+        }
         public PostgreSQLCopyHelper<LGFlatRecord> getPGHelper(String TabName)
         {
             var helper = new PostgreSQLCopyHelper<LGFlatRecord>(TabName.Contains("##") ? "temp" : "history", TabName.Replace("##", ""))
@@ -48,7 +53,7 @@ namespace adkuDBInterface.Model
             else if (num == 1) return IdObj;
             else if (num == 3) return DT;
             else if (num == 2) return Registr;
-            else if (num >= 4 /*&& num < Const.ANLG_RECORD_FIELD_COUNT + 4 && Data[num - 4] != -1000*/) return Data[num - 4];
+            else if (num >= 4 /*&& num < Const.ANLG_RECORD_FIELD_COUNT + 4 && Data[num - 4] != -1000*/) return NormalizeFloat(Data[num - 4]);
             else return null;
         }
         public int getFieldCount()

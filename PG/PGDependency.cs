@@ -12,12 +12,29 @@ namespace adkuDBInterface.PG
         string _watchSQL;
         bool _state = false;
         Thread _th;
+        Thread _dth;
         public event QueryChangeHandler onChange;
+
+
 
         private void NotificationSupportHelper(Object sender, NpgsqlNotificationEventArgs e)
         {
             if (onChange != null && _watchSQL.ToLower().Contains(e.Payload.ToLower()))
-                onChange(sender, e.Payload);
+            {
+                // задержка при массовом обновлении чтобы не сыпать сообщениями попусту
+                if (_dth != null) _dth.Interrupt();
+                _dth = new Thread(() => {
+                    try
+                    {
+                        Thread.Sleep(1000);
+                        onChange(sender, e.Payload);
+                    }
+                    catch (Exception e){
+                        //Console.WriteLine(e.Message);
+                    }
+                });
+                _dth.Start();
+            }
         }
         private void Do()
         {
