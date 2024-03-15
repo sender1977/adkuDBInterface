@@ -405,14 +405,16 @@ namespace adkuDBInterface
                 {
                     try
                     {
+                        string step = "";
 
                         try
                         {
                             await _pgConn.OpenAsync();
-
+                            step = "opened";
                             var cmd = new NpgsqlCommand(query, _pgConn);
+                            step = "command";
                             reader = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection);
-
+                            step = "execute";
 
                             while (await reader.ReadAsync())
                             {
@@ -438,7 +440,7 @@ namespace adkuDBInterface
                         }
                         catch (Exception ex)
                         {
-                            response.SetError(ex.Message, query);
+                            response.SetError(ex.Message + " " + step, query);
 
                         }
                     }
@@ -450,7 +452,7 @@ namespace adkuDBInterface
                 }
                 catch (Exception ex)
                 {
-                    response.SetError(ex.Message, query);
+                    response.SetError(ex.Message + " global", query);
 
                 }
 
@@ -641,19 +643,22 @@ namespace adkuDBInterface
                 try
                 {
                     SqlExecuteListResponse response = new SqlExecuteListResponse();
-
+                    string step = "";
 
                     try
                     {
                         await _pgConn.OpenAsync();
+                        step = "opened";
                         var cmd = new NpgsqlCommand(query, _pgConn);
-                        cmd.CommandTimeout = 60;
+                        step = "command";
+                        cmd.CommandTimeout = 300;
                         await cmd. ExecuteNonQueryAsync();
+
 
                     }
                     catch (Exception ex)
                     {
-                            response.SetError(ex.Message, query);
+                            response.SetError(ex.Message + "  " + step, query);
                     }
 
                     return response;
