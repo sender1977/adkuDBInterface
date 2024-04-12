@@ -807,6 +807,11 @@ namespace adkuDBInterface
                                 var helper = ((UstavRecord)rec).getPGHelper(quotab);
                                 await helper.SaveAllAsync(_pgConn, entities.Cast<UstavRecord>());
                             }
+                            else if (rec is LGTerminalRecord)
+                            {
+                                var helper = ((LGTerminalRecord)rec).getPGHelper(quotab);
+                                await helper.SaveAllAsync(_pgConn, entities.Cast<LGTerminalRecord>());
+                            }
 
                         }
                         return "";

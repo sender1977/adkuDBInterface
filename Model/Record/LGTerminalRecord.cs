@@ -18,10 +18,10 @@ namespace adkuDBInterface.Model
             var helper = new PostgreSQLCopyHelper<LGTerminalRecord>("history", TabName)
          .MapInteger("idmodem", x => x.IdModem)
          .MapInteger("idcontr", x => x.IdContr)
-         .MapTimeStamp("valuedate", x => x.ValueTime)
+         .MapTimeStamp("valuetime", x => x.ValueTime)
          .MapInteger("typemsg", x => x.TypeMsg)
          .MapText("data", x => x.Data)
-         .MapText("adddata", x => x.Data);
+         .MapText("adddata", x => x.AddData);
             return helper;
         }
 
