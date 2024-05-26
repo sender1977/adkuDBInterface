@@ -78,7 +78,9 @@ namespace adkuDBInterface
             if (paramList.ContainsKey("password")) result.Append($@"Password = {paramList["password"]};");
             if (paramList.ContainsKey("search path")) result.Append($@"Search Path = {paramList["search path"]};");
             if (paramList.ContainsKey("port")) result.Append($@"Port = {paramList["port"]};"); else result.Append($@"Port = 5432;");
-            result.Append($@"SSLMode = Prefer;Trust Server Certificate = true;CommandTimeout = 300;");
+            if (paramList.ContainsKey("commandtimeout")) result.Append($@"CommandTimeout = {paramList["commandtimeout"]};"); else
+            if (paramList.ContainsKey("command timeout")) result.Append($@"CommandTimeout = {paramList["command timeout"]};"); else result.Append($@"CommandTimeout = 300;");
+            result.Append($@"SSLMode = Prefer;Trust Server Certificate = true");
             return result.ToString();
         }
 
