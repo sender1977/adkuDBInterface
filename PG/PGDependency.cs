@@ -23,51 +23,62 @@ namespace adkuDBInterface.PG
             {
                 // задержка при массовом обновлении чтобы не сыпать сообщениями попусту
                 if (_dth != null) _dth.Interrupt();
-                _dth = new Thread(() => {
+                _dth = new Thread(() =>
+                {
                     try
                     {
                         Thread.Sleep(1000);
                         onChange(sender, e.Payload);
                     }
-                    catch (Exception e){
+                    catch (Exception e)
+                    {
                         //Console.WriteLine(e.Message);
                     }
                 });
                 _dth.Start();
             }
         }
+
         private void Do()
         {
             while (_state)
-            try
-            {
-                using (var conn = new NpgsqlConnection(_cs))
+                try
                 {
-
-
-                    //Console.Out.WriteLine("Opening connection");
-                    conn.Open();
-                    conn.Notification += NotificationSupportHelper;
-
-                    using (var com = new NpgsqlCommand("listen adku;", conn))
+                    using (var conn = new NpgsqlConnection(_cs))
                     {
-                        com.ExecuteNonQuery();
 
-                    }
+                        conn.Open();
+                        conn.Notification += NotificationSupportHelper;
+                        //Console.WriteLine("open");
+
+                        using (var com = new NpgsqlCommand("listen adku;", conn))
+                        {
+                            com.ExecuteNonQuery();
+
+                        }
+                        //Console.WriteLine("listen");
+
                         try
                         {
                             while (_state)
-                                conn.Wait();   // Thread will block here
+                            {
+                                conn.Wait(5000);   // Thread will block here
+                                //Console.WriteLine("wait");
+                            }
                         }
-                        catch { 
-                        
+                        catch
+                        {
+
                         }
-                    conn.Notification -= NotificationSupportHelper;
+                        //Console.WriteLine("close");
+                        conn.Notification -= NotificationSupportHelper;
+                        conn.Close();
+                    }
                 }
-            }
-            catch {
-                Thread.Sleep(300);
-            }
+                catch
+                {
+                    Thread.Sleep(300);
+                }
         }
         private void startListening()
         {
@@ -88,6 +99,7 @@ namespace adkuDBInterface.PG
             _watchSQL = watchSQL;
             _th = new Thread(Do);
             startListening();
+
         }
 
         ~PGDependency()
