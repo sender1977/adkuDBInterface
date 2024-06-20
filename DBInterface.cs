@@ -773,6 +773,31 @@ namespace adkuDBInterface
             }
         }
 
+        private async Task smartSaveLGRecordsPG(PostgreSQLCopyHelper.PostgreSQLCopyHelper<LGRecord> helper, IEnumerable<LGRecord> entities, NpgsqlConnection conn)
+        {
+            try
+            {
+                await helper.SaveAllAsync(conn, entities);
+            }
+            catch (Exception e) {
+                if (e.Message.ToLower().Contains("pkey"))
+                {
+                    int cntOk = 0;
+                    int cntFail = 0;
+                    foreach (var rec in entities)
+                        try
+                        {
+                            await helper.SaveAllAsync(conn, new List<LGRecord>() {rec});
+                            cntOk++;
+                        } catch {
+                            cntFail++;
+                        }
+                    if (cntFail>0) new Exception($@"Ошибка сохранения LG, нарушение PK всего записей: {entities.ToList().Count}; записано: {cntOk}; ошибок: {cntFail}");
+                }
+                else throw new Exception(e.Message);
+            }
+        }
+
 
         private async Task<String> pgBulkSave(Queue q, string tab)
         {
@@ -792,7 +817,8 @@ namespace adkuDBInterface
                             if (rec is LGRecord)
                             {
                                 var helper = ((LGRecord)rec).getPGHelper(quotab);
-                                await helper.SaveAllAsync(_pgConn, entities.Cast<LGRecord>());
+                                await smartSaveLGRecordsPG(helper, entities.Cast<LGRecord>(), _pgConn);
+                                //await helper.SaveAllAsync(_pgConn, entities.Cast<LGRecord>());
                             }
                             else if (rec is LGFlatRecord)
                             {
