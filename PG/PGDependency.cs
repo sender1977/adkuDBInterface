@@ -12,17 +12,25 @@ namespace adkuDBInterface.PG
         string _watchSQL;
         bool _state = false;
         Thread _th;
+        Thread _thWD;
         Thread _dth;
+        double _lastWatch = DateTime.Now.ToOADate();
+        double _lastFire = DateTime.Now.ToOADate();
         public event QueryChangeHandler onChange;
 
 
 
         private void NotificationSupportHelper(Object sender, NpgsqlNotificationEventArgs e)
         {
+            _lastFire = DateTime.Now.ToOADate();
             if (onChange != null && _watchSQL.ToLower().Contains(e.Payload.ToLower()))
             {
                 // задержка при массовом обновлении чтобы не сыпать сообщениями попусту
-                if (_dth != null) _dth.Interrupt();
+                if (_dth != null)
+                {
+                    _dth.Interrupt();
+                    _dth.Join();
+                }
                 _dth = new Thread(() =>
                 {
                     try
@@ -38,6 +46,7 @@ namespace adkuDBInterface.PG
                 _dth.Start();
             }
         }
+
 
         private void Do()
         {
@@ -63,12 +72,12 @@ namespace adkuDBInterface.PG
                             while (_state)
                             {
                                 conn.Wait(5000);   // Thread will block here
-                                //Console.WriteLine("wait");
+                                _lastWatch = DateTime.Now.ToOADate();
+
                             }
                         }
                         catch
                         {
-
                         }
                         //Console.WriteLine("close");
                         conn.Notification -= NotificationSupportHelper;
@@ -80,6 +89,49 @@ namespace adkuDBInterface.PG
                     Thread.Sleep(300);
                 }
         }
+        private void WatchDog()
+        {
+            void restartWatcher()
+            {
+                _state = false;
+                _th.Interrupt();
+                _th.Join(10000);
+                _th = new Thread(Do);
+                startListening();
+
+            }
+            while (_state)
+                try
+                {
+                    int i = 0;
+                    while (_state && i < 100)
+                    {
+                        i++;
+                        Thread.Sleep(100);
+                    }
+                    // чето wathdog завис передернем его
+                    if (Math.Abs(DateTime.Now.ToOADate() - _lastWatch) * 24 * 60 * 60 > 60)
+                    {
+                        Console.WriteLine($"watcher завис - перезапуск потока {_watchSQL}");
+                        restartWatcher();
+                    }
+                    // давно не было сработок вотчера
+                    if (Math.Abs(DateTime.Now.ToOADate() - _lastFire) * 24 * 60 * 60 > 300)
+                    {
+                        Console.WriteLine($"watcher не срабатывет - перезапуск потока {_watchSQL}");
+                        _lastFire = DateTime.Now.ToOADate();
+                        restartWatcher();
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("ошибка watchdog " + e.Message);
+                }
+            
+        }
+
+
         private void startListening()
         {
             _state = true;
@@ -89,8 +141,8 @@ namespace adkuDBInterface.PG
         public void stopListening()
         {
             _state = false;
-
             _th.Join();
+            _thWD.Join();
         }
 
         public PGDependency(string connectionString, string watchSQL)
@@ -99,6 +151,8 @@ namespace adkuDBInterface.PG
             _watchSQL = watchSQL;
             _th = new Thread(Do);
             startListening();
+            _thWD = new Thread(WatchDog);
+            _thWD.Start();
 
         }
 
