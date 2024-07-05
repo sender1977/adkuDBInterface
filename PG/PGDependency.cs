@@ -50,44 +50,53 @@ namespace adkuDBInterface.PG
 
         private void Do()
         {
-            while (_state)
-                try
-                {
-                    using (var conn = new NpgsqlConnection(_cs))
+            try
+            {
+                while (_state)
+
+                    try
                     {
-
-                        conn.Open();
-                        conn.Notification += NotificationSupportHelper;
-                        //Console.WriteLine("open");
-
-                        using (var com = new NpgsqlCommand("listen adku;", conn))
+                        using (var conn = new NpgsqlConnection(_cs))
                         {
-                            com.ExecuteNonQuery();
+                            conn.Open();
+                            conn.Notification += NotificationSupportHelper;
+                            //Console.WriteLine("open");
 
-                        }
-                        //Console.WriteLine("listen");
-
-                        try
-                        {
-                            while (_state)
+                            using (var com = new NpgsqlCommand("listen adku;", conn))
                             {
-                                conn.Wait(5000);   // Thread will block here
-                                _lastWatch = DateTime.Now.ToOADate();
+                                com.ExecuteNonQuery();
 
                             }
+                            //Console.WriteLine("listen");
+
+                            try
+                            {
+                                while (_state)
+                                {
+                                    conn.Wait(5000);   // Thread will block here
+                                    _lastWatch = DateTime.Now.ToOADate();
+                                    // проверка соединения
+                                    using (var com = new NpgsqlCommand("select 1;", conn)) { com.ExecuteNonQuery(); }
+
+                                }
+                            }
+                            catch
+                            {
+                            }
+                            //Console.WriteLine("close");
+                            conn.Notification -= NotificationSupportHelper;
+                            conn.Close();
                         }
-                        catch
-                        {
-                        }
-                        //Console.WriteLine("close");
-                        conn.Notification -= NotificationSupportHelper;
-                        conn.Close();
                     }
-                }
-                catch
-                {
-                    Thread.Sleep(300);
-                }
+                    catch
+                    {
+                        Thread.Sleep(1000);
+                    }
+            }
+            catch (ThreadInterruptedException e)
+            {
+                //Console.WriteLine("newThread cannot go to sleep - interrupted by main thread.");
+            }
         }
         private void WatchDog()
         {
@@ -112,7 +121,7 @@ namespace adkuDBInterface.PG
                     // чето wathdog завис передернем его
                     if (Math.Abs(DateTime.Now.ToOADate() - _lastWatch) * 24 * 60 * 60 > 60)
                     {
-                        Console.WriteLine($"watcher завис - перезапуск потока {_watchSQL}");
+                        Console.WriteLine($"watcher завис - перезапуск потока {_watchSQL} {_cs}");
                         restartWatcher();
                     }
                     // давно не было сработок вотчера
@@ -145,9 +154,17 @@ namespace adkuDBInterface.PG
             _thWD.Join();
         }
 
+        private string buildConnectionString(string instr) {
+            string result = "";
+            string[] list = instr.Split(";");
+            foreach (var elem in list)
+                if (!elem.ToLower().Contains("commandtimeout")) result = result + elem + ";";
+            return result + "; commandtimeout = 3;";
+        }
+
         public PGDependency(string connectionString, string watchSQL)
         {
-            _cs = connectionString;
+            _cs = buildConnectionString(connectionString);
             _watchSQL = watchSQL;
             _th = new Thread(Do);
             startListening();
