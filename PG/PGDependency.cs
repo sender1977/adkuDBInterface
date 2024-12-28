@@ -22,9 +22,10 @@ namespace adkuDBInterface.PG
 
         private void NotificationSupportHelper(Object sender, NpgsqlNotificationEventArgs e)
         {
-            _lastFire = DateTime.Now.ToOADate();
+            
             if (onChange != null && _watchSQL.ToLower().Contains(e.Payload.ToLower()))
             {
+                _lastFire = DateTime.Now.ToOADate();
                 // задержка при массовом обновлении чтобы не сыпать сообщениями попусту
                 if (_dth != null)
                 {
@@ -98,17 +99,20 @@ namespace adkuDBInterface.PG
                 //Console.WriteLine("newThread cannot go to sleep - interrupted by main thread.");
             }
         }
+
+        void restartWatcher()
+        {
+            _state = false;
+            _th.Interrupt();
+            _th.Join(10000);
+            _th = new Thread(Do);
+            startListening();
+
+
+        }
+
         private void WatchDog()
         {
-            void restartWatcher()
-            {
-                _state = false;
-                _th.Interrupt();
-                _th.Join(10000);
-                _th = new Thread(Do);
-                startListening();
-
-            }
             while (_state)
                 try
                 {
@@ -130,6 +134,9 @@ namespace adkuDBInterface.PG
                         Console.WriteLine($"watcher не срабатывет - перезапуск потока {_watchSQL}");
                         _lastFire = DateTime.Now.ToOADate();
                         restartWatcher();
+                        // посылаем сигнал обновить данные
+                        if (onChange != null) onChange(this, "");
+
                     }
 
                 }

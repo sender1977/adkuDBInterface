@@ -80,7 +80,7 @@ namespace adkuDBInterface
             if (paramList.ContainsKey("port")) result.Append($@"Port = {paramList["port"]};"); else result.Append($@"Port = 5432;");
             if (paramList.ContainsKey("commandtimeout")) result.Append($@"CommandTimeout = {paramList["commandtimeout"]};"); else
             if (paramList.ContainsKey("command timeout")) result.Append($@"CommandTimeout = {paramList["command timeout"]};"); else result.Append($@"CommandTimeout = 300;");
-            result.Append($@"SSLMode = Prefer;Trust Server Certificate = true");
+            result.Append($@"Timeout=5;SSLMode = Prefer;Trust Server Certificate = true");
             return result.ToString();
         }
 
@@ -408,7 +408,7 @@ namespace adkuDBInterface
                     try
                     {
                         string step = "";
-
+                        //var start = DateTime.Now.ToOADate();
                         try
                         {
                             await _pgConn.OpenAsync();
@@ -417,6 +417,8 @@ namespace adkuDBInterface
                             step = "command";
                             reader = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection);
                             step = "execute";
+
+                            //if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 2) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}e.log", query);
 
                             while (await reader.ReadAsync())
                             {
@@ -435,10 +437,11 @@ namespace adkuDBInterface
                                     }
                                     readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
                                 }
-
+                            
 
                                 response.data.Add(readerItem);
                             }
+                           // if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 2) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}a.log", query);
                         }
                         catch (Exception ex)
                         {
@@ -472,16 +475,19 @@ namespace adkuDBInterface
                 NpgsqlDataReader reader = null;
                 try { 
                 try
-                {
-
-                    try
                     {
+                        //var start = DateTime.Now.ToOADate();
+
+
+                        try
+                        {
                         _pgConn.Open();
 
                         var cmd = new NpgsqlCommand(query, _pgConn);
                         reader = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+                        //if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 2) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}e.log", query);
 
-                        while (reader.Read())
+                            while (reader.Read())
                         {
                             IDictionary<int, SQLObject> readerItem = new Dictionary<int, SQLObject>();
                             // результут записываем в виде списка объектов { поле: значение }
@@ -502,7 +508,8 @@ namespace adkuDBInterface
 
                             response.data.Add(readerItem);
                         }
-                    }
+                            //if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 5) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}a.log", query);
+                        }
                     catch (Exception ex)
                     {
                         response.SetError(ex.Message, query);
