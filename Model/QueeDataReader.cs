@@ -8,7 +8,7 @@ namespace adkuDBInterface.Model
     {
 
         private Queue cmdQueue;
-        IAdkuRecord currRec;
+        IAdkuRecordBase currRec;
 
         // Конструктор
         public QueueDataReader(Queue aCmdQueue)//, Type aRecType)
@@ -33,7 +33,7 @@ namespace adkuDBInterface.Model
             //if (cmdQueue.Count==0||cnt<=0) return false;
             if (cmdQueue.Count == 0) return false;
             //cnt--;
-            currRec = (IAdkuRecord)cmdQueue.Dequeue();
+            currRec = (IAdkuRecordBase)cmdQueue.Dequeue();
             return true;// Read();
         }
 
@@ -45,7 +45,7 @@ namespace adkuDBInterface.Model
             get
             {
                 int res = 0;
-                foreach (IAdkuRecord rec in cmdQueue)
+                foreach (IAdkuRecordBase rec in cmdQueue)
                 {
                     res = rec.getFieldCount();
                     break;

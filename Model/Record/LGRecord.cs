@@ -4,7 +4,7 @@ using PostgreSQLCopyHelper;
 
 namespace adkuDBInterface.Model
 {
-    public class LGRecord : IAdkuRecord
+    public class LGRecord : IAdkuRecord<LGRecord>
     {
         public int TypeObj;
         public int IdPar;

@@ -17,7 +17,7 @@ namespace adkuDBInterface.PG
         double _lastWatch = DateTime.Now.ToOADate();
         double _lastFire = DateTime.Now.ToOADate();
         public event QueryChangeHandler onChange;
-
+        int _waitCnt = 0;
 
 
         private void NotificationSupportHelper(Object sender, NpgsqlNotificationEventArgs e)
@@ -26,17 +26,23 @@ namespace adkuDBInterface.PG
             if (onChange != null && _watchSQL.ToLower().Contains(e.Payload.ToLower()))
             {
                 _lastFire = DateTime.Now.ToOADate();
-                // задержка при массовом обновлении чтобы не сыпать сообщениями попусту
-                if (_dth != null)
+                // задержка при массовом обновлении чтобы не сыпать сообщениями попусту;
+                // максимум 5 задержек - после 5-ой ничего не прерываем не запускаем - поток _dth завершится и сообщение уйдет подписчику
+                if (_dth != null && _waitCnt < 5)
                 {
                     _dth.Interrupt();
                     _dth.Join();
+                    _waitCnt++;
                 }
+                else if (_dth != null) return;
+
                 _dth = new Thread(() =>
                 {
                     try
                     {
                         Thread.Sleep(1000);
+                        _waitCnt = 0;
+                        //Console.WriteLine($"{e.Payload.ToLower()} {_cs.Substring(1, 15)}");
                         onChange(sender, e.Payload);
                     }
                     catch (Exception e)
@@ -53,14 +59,19 @@ namespace adkuDBInterface.PG
         {
             try
             {
+                int step = 0;
                 while (_state)
 
                     try
                     {
+                        step = 1;
                         using (var conn = new NpgsqlConnection(_cs))
                         {
+                            step = 2;
                             conn.Open();
+                            step = 3;
                             conn.Notification += NotificationSupportHelper;
+                            step = 4;
                             //Console.WriteLine("open");
 
                             using (var com = new NpgsqlCommand("listen adku;", conn))
@@ -68,12 +79,14 @@ namespace adkuDBInterface.PG
                                 com.ExecuteNonQuery();
 
                             }
+                            step = 5;
                             //Console.WriteLine("listen");
 
                             try
                             {
                                 while (_state)
                                 {
+                                    step = 6;
                                     conn.Wait(5000);   // Thread will block here
                                     _lastWatch = DateTime.Now.ToOADate();
                                     // проверка соединения
@@ -89,9 +102,10 @@ namespace adkuDBInterface.PG
                             conn.Close();
                         }
                     }
-                    catch
+                    catch (Exception e)
                     {
-                        Thread.Sleep(1000);
+                        System.Console.WriteLine($"Ошибка вотчера step={step} {_watchSQL} {_cs} {e.Message} "); 
+                        Thread.Sleep(3000);
                     }
             }
             catch (ThreadInterruptedException e)
@@ -103,11 +117,12 @@ namespace adkuDBInterface.PG
         void restartWatcher()
         {
             _state = false;
-            _th.Interrupt();
-            _th.Join(10000);
+            _waitCnt = 0;
+            //_th.Interrupt();
+            //_th.Join(10000); 
+            if (!_th.Join(10000)) _th.Interrupt();
             _th = new Thread(Do);
             startListening();
-
 
         }
 

@@ -3,7 +3,7 @@ using PostgreSQLCopyHelper;
 
 namespace adkuDBInterface.Model
 {
-    public class LGFlatRecord : IAdkuRecord
+    public class LGFlatRecord : IAdkuRecord<LGFlatRecord>
     {
         public int TypeObj;
         public int IdObj;

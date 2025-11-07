@@ -780,7 +780,7 @@ namespace adkuDBInterface
             }
         }
 
-        private async Task smartSaveLGRecordsPG(PostgreSQLCopyHelper.PostgreSQLCopyHelper<LGRecord> helper, IEnumerable<LGRecord> entities, NpgsqlConnection conn)
+        /*private async Task smartSaveLGRecordsPG(PostgreSQLCopyHelper.PostgreSQLCopyHelper<LGRecord> helper, IEnumerable<LGRecord> entities, NpgsqlConnection conn)
         {
             try
             {
@@ -803,8 +803,32 @@ namespace adkuDBInterface
                 }
                 else throw new Exception(e.Message);
             }
-        }
+        }*/
 
+        private async Task smartSaveRecordsPG<T>(PostgreSQLCopyHelper.PostgreSQLCopyHelper<T> helper, IEnumerable<T> entities, NpgsqlConnection conn, string tab)
+        {
+            try
+            {
+                await helper.SaveAllAsync(conn, entities);
+            }
+            catch (Exception e) {
+                if (e.Message.ToLower().Contains("pkey"))
+                {
+                    int cntOk = 0;
+                    int cntFail = 0;
+                    foreach (var rec in entities)
+                        try
+                        {
+                            await helper.SaveAllAsync(conn, new List<T>() {rec});
+                            cntOk++;
+                        } catch {
+                            cntFail++;
+                        }
+                    if (cntFail>0) new Exception($@"Ошибка сохранения {tab}, нарушение PK всего записей: {entities.ToList().Count}; записано: {cntOk}; ошибок: {cntFail}");
+                }
+                else throw new Exception(e.Message);
+            }
+        }
 
         private async Task<String> pgBulkSave(Queue q, string tab)
         {
@@ -824,13 +848,14 @@ namespace adkuDBInterface
                             if (rec is LGRecord)
                             {
                                 var helper = ((LGRecord)rec).getPGHelper(quotab);
-                                await smartSaveLGRecordsPG(helper, entities.Cast<LGRecord>(), _pgConn);
+                                await smartSaveRecordsPG(helper, entities.Cast<LGRecord>(), _pgConn, "LG");
                                 //await helper.SaveAllAsync(_pgConn, entities.Cast<LGRecord>());
                             }
                             else if (rec is LGFlatRecord)
                             {
                                 var helper = ((LGFlatRecord)rec).getPGHelper(quotab);
-                                await helper.SaveAllAsync(_pgConn, entities.Cast<LGFlatRecord>());
+                                await smartSaveRecordsPG(helper, entities.Cast<LGFlatRecord>(), _pgConn, "LGFlat");
+                                //await helper.SaveAllAsync(_pgConn, entities.Cast<LGFlatRecord>());
                             }
                             else if (rec is DatRecord)
                             {

@@ -4,7 +4,7 @@ using PostgreSQLCopyHelper;
 
 namespace adkuDBInterface.Model
 {
-    public class LGTerminalRecord : IAdkuRecord
+    public class LGTerminalRecord : IAdkuRecord<LGTerminalRecord>
     {
         public int IdModem;
         public int IdContr;

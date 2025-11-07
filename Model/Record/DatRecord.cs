@@ -3,7 +3,7 @@ using PostgreSQLCopyHelper;
 
 namespace adkuDBInterface.Model
 {
-    public class DatRecord : IAdkuRecord
+    public class DatRecord : IAdkuRecord<DatRecord>
     {
         public int IdDat;
         public Double DValue;
