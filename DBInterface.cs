@@ -21,6 +21,8 @@ namespace adkuDBInterface
         private SortedList<T, SqlString> _sqlConst;
         private string _connectionString;
         private ConnectionTypes _connType = ConnectionTypes.MSSQL;
+        private string _useremoteip = "";
+
 
         private SortedList<string, PGDependency> _pgDependencies = new SortedList<string, PGDependency>();
         private SortedList<string, MSSQLDependency> _msDependencies = new SortedList<string, MSSQLDependency>();
@@ -80,7 +82,12 @@ namespace adkuDBInterface
             if (paramList.ContainsKey("port")) result.Append($@"Port = {paramList["port"]};"); else result.Append($@"Port = 5432;");
             if (paramList.ContainsKey("commandtimeout")) result.Append($@"CommandTimeout = {paramList["commandtimeout"]};"); else
             if (paramList.ContainsKey("command timeout")) result.Append($@"CommandTimeout = {paramList["command timeout"]};"); else result.Append($@"CommandTimeout = 300;");
-            result.Append($@"Timeout=5;SSLMode = Prefer;Trust Server Certificate = true");
+            if (paramList.ContainsKey("connectiontimeout")) result.Append($@"Timeout = {paramList["connectiontimeout"]};"); else
+            if (paramList.ContainsKey("connection timeout")) result.Append($@"Timeout = {paramList["connection timeout"]};"); else result.Append($@"Timeout = 5;");
+            result.Append($@"SSLMode = Prefer;Trust Server Certificate = true");
+
+            if (paramList.ContainsKey("remoteip")) _useremoteip = paramList["remoteip"];
+
             return result.ToString();
         }
 
@@ -121,7 +128,7 @@ namespace adkuDBInterface
         private string prepareSql(ConnectionTypes connType, T sql, Dictionary<string, string> paramList) {
             if (_connType == ConnectionTypes.MSSQL) return prepareSql(_sqlConst[sql].sql_mssql, paramList);
             else if (_connType == ConnectionTypes.PG) return prepareSql(_sqlConst[sql].sql_pg, paramList);
-            else return "";    
+            else return "";
 
         }
 
@@ -196,7 +203,7 @@ namespace adkuDBInterface
         public string getConnectionString()
         {
             SortedList<string, string> conParams = parseConnectionString();
-            if (getConnectionType()==ConnectionTypes.MSSQL) return buildMSSQLConnectionString();
+            if (getConnectionType() == ConnectionTypes.MSSQL) return buildMSSQLConnectionString();
             else if (getConnectionType() == ConnectionTypes.PG) return buildPGConnectionString();
             else return "";
         }
@@ -397,9 +404,19 @@ namespace adkuDBInterface
 
         private async Task<SqlExecuteListResponse> pgExecuteAndGetList(string query)
         {
-            using (NpgsqlConnection _pgConn = new NpgsqlConnection(buildPGConnectionString()))
+            string connStr = buildPGConnectionString();
+            //если в строке соединения указано удаленное выполнение 
+            if (!String.IsNullOrEmpty(_useremoteip) && !isLocalIp(_useremoteip))
+            {
+                var tempres = remoteExecuteAndGetList(new RemoteQueryParam { connstr = connStr, query = query });
+                if (String.IsNullOrEmpty(tempres.errorText) || !tempres.errorText.StartsWith("SOCKET")) return tempres;
+            }
+
+            using (NpgsqlConnection _pgConn = new NpgsqlConnection(connStr))
             {            //private SqlConnection _msConn = null;
                          //private NpgsqlConnection _pgConn = null;
+                         // если запрос нужно выполнить на удаленном сервере
+                
 
                 SqlExecuteListResponse response = new SqlExecuteListResponse();
                 NpgsqlDataReader reader = null;
@@ -437,11 +454,11 @@ namespace adkuDBInterface
                                     }
                                     readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
                                 }
-                            
+
 
                                 response.data.Add(readerItem);
                             }
-                           // if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 2) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}a.log", query);
+                            // if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 2) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}a.log", query);
                         }
                         catch (Exception ex)
                         {
@@ -467,59 +484,69 @@ namespace adkuDBInterface
 
         private SqlExecuteListResponse pgExecuteAndGetListSync(string query)
         {
-            using (NpgsqlConnection _pgConn = new NpgsqlConnection(buildPGConnectionString()))
+            string connStr = buildPGConnectionString();
+            //если в строке соединения указано удаленное выполнение 
+            if (!String.IsNullOrEmpty(_useremoteip) && !isLocalIp(_useremoteip))
+            {
+                var tempres = remoteExecuteAndGetList(new RemoteQueryParam { connstr = connStr, query = query });
+                if (String.IsNullOrEmpty(tempres.errorText) || !tempres.errorText.StartsWith("SOCKET")) return tempres;
+            }
+
+            using (NpgsqlConnection _pgConn = new NpgsqlConnection(connStr))
             {            //private SqlConnection _msConn = null;
                          //private NpgsqlConnection _pgConn = null;
 
+
+
                 SqlExecuteListResponse response = new SqlExecuteListResponse();
                 NpgsqlDataReader reader = null;
-                try { 
-                try
+                try {
+                    try
                     {
                         //var start = DateTime.Now.ToOADate();
 
 
                         try
                         {
-                        _pgConn.Open();
+                            _pgConn.Open();
 
-                        var cmd = new NpgsqlCommand(query, _pgConn);
-                        reader = cmd.ExecuteReader(CommandBehavior.CloseConnection);
-                        //if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 2) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}e.log", query);
+                            var cmd = new NpgsqlCommand(query, _pgConn);
+                            reader = cmd.ExecuteReader(CommandBehavior.CloseConnection);
+                            //if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 2) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}e.log", query);
 
                             while (reader.Read())
-                        {
-                            IDictionary<int, SQLObject> readerItem = new Dictionary<int, SQLObject>();
-                            // результут записываем в виде списка объектов { поле: значение }
-                            // поле - название колонки, анонимная колонка получает название field + номер колонки
-                            //IDictionary<string, object> readerItem = new Dictionary<string, object>();
-                            for (int i = 0; i < reader.FieldCount; i++)
                             {
-                                if (!response.fieldNames.ContainsKey(i))
+                                IDictionary<int, SQLObject> readerItem = new Dictionary<int, SQLObject>();
+                                // результут записываем в виде списка объектов { поле: значение }
+                                // поле - название колонки, анонимная колонка получает название field + номер колонки
+                                //IDictionary<string, object> readerItem = new Dictionary<string, object>();
+                                for (int i = 0; i < reader.FieldCount; i++)
                                 {
-                                    string name = reader.GetName(i);
-                                    if (name == "") name = "field" + i.ToString();
-                                    while (response.fieldNames.Values.Contains(name)) name += "_";
-                                    response.fieldNames.Add(i, name);
+                                    if (!response.fieldNames.ContainsKey(i))
+                                    {
+                                        string name = reader.GetName(i);
+                                        if (name == "") name = "field" + i.ToString();
+                                        while (response.fieldNames.Values.Contains(name)) name += "_";
+                                        response.fieldNames.Add(i, name);
+                                    }
+                                    readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
                                 }
-                                readerItem.Add(i, new SQLObject(reader.IsDBNull(i) ? null : reader[i]));
+
+
+                                response.data.Add(readerItem);
                             }
-
-
-                            response.data.Add(readerItem);
-                        }
                             //if ((DateTime.Now.ToOADate() - start) * 24 * 60 * 60 > 5) System.IO.File.WriteAllText($"/home/txt/{DateTime.Now.ToString("yyyyMMdd.HHmmss.fff")} {Math.Floor((DateTime.Now.ToOADate() - start) * 24 * 60 * 60)}a.log", query);
                         }
-                    catch (Exception ex)
-                    {
-                        response.SetError(ex.Message, query);
+                        catch (Exception ex)
+                        {
+                            response.SetError(ex.Message, query);
+                        }
                     }
-                }
-                finally
-                {
-                    if (reader != null) reader.Close();
-                    _pgConn.Close();
-                }
+                    finally
+                    {
+                        if (reader != null) reader.Close();
+                        _pgConn.Close();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -607,7 +634,7 @@ namespace adkuDBInterface
                         cmd.CommandType = CommandType.Text;
                         cmd.CommandText = query;
                         reader = cmd.ExecuteReader();
-                        
+
                         Dictionary<string, int> fields = new Dictionary<string, int>();
                         while (reader.Read())
                         {
@@ -661,13 +688,13 @@ namespace adkuDBInterface
                         var cmd = new NpgsqlCommand(query, _pgConn);
                         step = "command";
                         cmd.CommandTimeout = 300;
-                        await cmd. ExecuteNonQueryAsync();
+                        await cmd.ExecuteNonQueryAsync();
 
 
                     }
                     catch (Exception ex)
                     {
-                            response.SetError(ex.Message + "  " + step, query);
+                        response.SetError(ex.Message + "  " + step, query);
                     }
 
                     return response;
@@ -819,12 +846,12 @@ namespace adkuDBInterface
                     foreach (var rec in entities)
                         try
                         {
-                            await helper.SaveAllAsync(conn, new List<T>() {rec});
+                            await helper.SaveAllAsync(conn, new List<T>() { rec });
                             cntOk++;
                         } catch {
                             cntFail++;
                         }
-                    if (cntFail>0) new Exception($@"Ошибка сохранения {tab}, нарушение PK всего записей: {entities.ToList().Count}; записано: {cntOk}; ошибок: {cntFail}");
+                    if (cntFail > 0) new Exception($@"Ошибка сохранения {tab}, нарушение PK всего записей: {entities.ToList().Count}; записано: {cntOk}; ошибок: {cntFail}");
                 }
                 else throw new Exception(e.Message);
             }
@@ -888,14 +915,14 @@ namespace adkuDBInterface
             }
         }
 
-        string getRows (Queue q) {
+        string getRows(Queue q) {
             StringBuilder s = new StringBuilder("\n");
             foreach (LGFlatRecord rec in q) {
                 s.Append($"{rec.TypeObj}   {rec.IdObj}     {rec.Registr}   {rec.DT.ToOADate()} \n");
             }
             return s.ToString();
         }
-        private async Task<String> msBulkSave(Queue q, string tab, int attempt = 0, string err="")
+        private async Task<String> msBulkSave(Queue q, string tab, int attempt = 0, string err = "")
         {
             Queue copy = (Queue)q.Clone();
             if (!String.IsNullOrEmpty(tab))
@@ -921,23 +948,23 @@ namespace adkuDBInterface
                         //if (fields.Length > 1 && !int.TryParse(fields[1], out id)) id = 0;
                         SortedList<string, List<LGFlatRecord>> all = new SortedList<string, List<LGFlatRecord>>();
                         foreach (LGFlatRecord rec in copy)
-                        {   
+                        {
                             // корректируем 
                             //if (rec.IdObj == id || id == 0) rec.DT = rec.DT.AddMilliseconds(rnd.Next(5, 20));
                             string key = $"{rec.TypeObj}_{rec.IdObj}_{rec.Registr}";
                             if (all.ContainsKey(key)) all[key].Add(rec); else all.Add(key, new List<LGFlatRecord> { rec });
                         }
-                        
+
                         foreach (List<LGFlatRecord> recs in all.Values)
                             if (recs.Count > 1) foreach (LGFlatRecord rec in recs) rec.DT = rec.DT.AddMilliseconds(10 * (recs.IndexOf(rec) + 1));
-                            else recs[0].DT = recs[0].DT.AddMilliseconds(rnd.Next(5,20));
+                            else recs[0].DT = recs[0].DT.AddMilliseconds(rnd.Next(5, 20));
 
                         return await msBulkSave(copy, tab, attempt + 1, e.Message);
                     }
                     else
                         return e.Message + (tab.ToLower().Contains("lgflat") ? getRows(copy) : "") + $" попытка {attempt}";
                 }
-            return (attempt <= 3 ? "": $"Были проблемы с первичным ключом, но сохранение прошло с попытки {attempt} ошибка: {err}");
+            return (attempt <= 3 ? "" : $"Были проблемы с первичным ключом, но сохранение прошло с попытки {attempt} ошибка: {err}");
 
         }
 
@@ -964,6 +991,142 @@ namespace adkuDBInterface
 
         }
 
-    }
+        private static bool isLocalIp(string inIP) {
+            try
+            {
+                if (String.IsNullOrEmpty(inIP)) return true;
+                string ip = inIP.Split(':')[0];
+                string hostName = System.Net.Dns.GetHostName();
+                // Получаем все IP-адреса, связанные с именем хоста
+                System.Net.IPAddress[] addresses = System.Net.Dns.GetHostAddresses(hostName);
+                bool result = false;
+                foreach (System.Net.IPAddress address in addresses)
+                    if (address.ToString() == ip)
+                    {
+                        result = true;
+                        break;
+                    }
 
+                return result;
+            }
+            catch {
+                return false;
+            }
+        }
+
+        private SqlExecuteListResponse remoteExecuteAndGetList(RemoteQueryParam p) {
+            SqlExecuteListResponse result = new SqlExecuteListResponse();
+            var end = Encoding.UTF8.GetBytes("<EOF>");
+
+            Byte[] q = CompressString(System.Text.Json.JsonSerializer.Serialize(p));
+
+            Byte[] byteArray = new Byte[q.Length + end.Length];
+            q.CopyTo(byteArray, 0);
+            end.CopyTo(byteArray, q.Length);
+            // отправить по сокету
+            if (_useremoteip.Split(':').Length == 2)
+                // Connect to a remote device.  
+                try
+                {
+                    System.Net.IPAddress ipAddress = System.Net.IPAddress.Parse(_useremoteip.Split(':')[0]);
+                    System.Net.IPEndPoint remoteEP = new System.Net.IPEndPoint(ipAddress, int.Parse(_useremoteip.Split(':')[1]));
+                    System.Net.Sockets.Socket sender = new System.Net.Sockets.Socket(ipAddress.AddressFamily, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+
+                    try
+                    {
+                        sender.Connect(remoteEP);
+                        int bytesSent = sender.Send(byteArray);
+
+                        byte[] data;
+                        using (var ms = new System.IO.MemoryStream())
+                        {
+                            byte[] buffer = new byte[1024];
+                            int received;
+                            while ((received = sender.Receive(buffer)) > 0)
+                            {
+                                ms.Write(buffer, 0, received);
+                            }
+                            data = ms.ToArray();
+                        }
+                        int bytes = data.Length;
+
+                        if (bytes > end.Length && data[bytes - 1] == end[end.Length - 1] && data[bytes - 2] == end[end.Length - 2] && data[bytes - 3] == end[end.Length - 3])
+                        {
+                            Array.Resize(ref data, bytes - end.Length);
+                            try
+                            {
+                                string json = DecompressString(data);
+                                result = Newtonsoft.Json.JsonConvert.DeserializeObject<SqlExecuteListResponse>(json);
+                            }
+                            catch (Exception e)
+                            {
+
+                                result.errorText = "SOCKET. Ошибка преобразования удаленных данных JSON в объект " + e.Message;
+                            }
+
+                        }
+                        else result.errorText = "SOCKET. Ошибка формата данных от удаленного сервера " + bytes.ToString();
+
+                        // Release the socket.  
+                        sender.Shutdown(System.Net.Sockets.SocketShutdown.Both);
+                        sender.Close();
+
+                    }
+                    catch (Exception e)
+                    {
+                        result.errorText = "SOCKET. Ошибка сокета " + e.Message;
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    result.errorText = "SOCKET. Ошибка соединения сокета " + e.Message;
+                }
+            else
+                result.errorText = "SOCKET. Некорректно указан удаленный сервер " + _useremoteip;
+
+
+            
+            return result;
+
+        }
+
+
+        static Byte[] CompressString(string value)
+        {
+            Byte[] byteArray = new byte[0];
+            if (!string.IsNullOrEmpty(value))
+            {
+                byteArray = Encoding.UTF8.GetBytes(value);
+                using (System.IO.MemoryStream stream = new System.IO.MemoryStream())
+                {
+                    using (System.IO.Compression.GZipStream zip = new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Compress))
+                    {
+                        zip.Write(byteArray, 0, byteArray.Length);
+                    }
+                    byteArray = stream.ToArray();
+
+                }
+            }
+            return byteArray;
+        }
+
+
+        public static string DecompressString(Byte[] value)
+        {
+            string resultString = string.Empty;
+            if (value != null && value.Length > 0)
+            {
+                using (System.IO.MemoryStream stream = new System.IO.MemoryStream(value))
+                using (System.IO.Compression.GZipStream zip = new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Decompress))
+                using (System.IO.StreamReader reader = new System.IO.StreamReader(zip))
+                {
+                    resultString = reader.ReadToEnd();
+                }
+            }
+            //System.IO.File.WriteAllText($@"c:\Temp\{DateTime.Now.Second}.txt", resultString);
+            return resultString;
+        }
+
+    }
 }
