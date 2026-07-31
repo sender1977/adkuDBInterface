@@ -18,6 +18,7 @@ namespace adkuDBInterface.Model
         public int Flag;
         public int Quality = 192;
         public bool NoFlat;
+        public string StrValue;
 
         public PostgreSQLCopyHelper<LGRecord> getPGHelper(String TabName)
         {
@@ -53,7 +54,7 @@ namespace adkuDBInterface.Model
             return 9;
         }
 
-        public LGRecord(int aTypeObj, int aIdPar, int aIdObj, Double aDValue, DateTime aValueTime, int aPeriod, int aFlag, int aQvt = 192)
+        public LGRecord(int aTypeObj, int aIdPar, int aIdObj, Double aDValue, DateTime aValueTime, int aPeriod, int aFlag, int aQvt = 192, string aStrValue="")
         {
             TypeObj = aTypeObj;
             IdPar = aIdPar;
@@ -64,6 +65,7 @@ namespace adkuDBInterface.Model
             Flag = aFlag;
             NoFlat = false;
             Quality = aQvt;
+            StrValue = aStrValue;
         }
         public void Assign(LGRecord src)
         {
@@ -76,6 +78,7 @@ namespace adkuDBInterface.Model
             this.Flag = src.Flag;
             this.NoFlat = src.NoFlat;
             this.Quality = src.Quality;
+            this.StrValue = src.StrValue;
         }
 
         public int CompareTo(object obj)

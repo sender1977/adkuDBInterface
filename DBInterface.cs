@@ -22,6 +22,7 @@ namespace adkuDBInterface
         private string _connectionString;
         private ConnectionTypes _connType = ConnectionTypes.MSSQL;
         private string _useremoteip = "";
+        private string _redundanceip = "";
 
 
         private SortedList<string, PGDependency> _pgDependencies = new SortedList<string, PGDependency>();
@@ -66,13 +67,47 @@ namespace adkuDBInterface
             return result.ToString();
         }
 
-        private string buildPGConnectionString()
+        public static string buildPGConnectionStringStatic(SortedList<string, string> paramList, string toredundance = null) {
+            StringBuilder result = new StringBuilder();
+            
+            if (paramList.ContainsKey("server")) result.Append($@"Server = {(!String.IsNullOrEmpty(toredundance) ? toredundance : paramList["server"])};");
+            if (paramList.ContainsKey("host")) result.Append($@"Server = {(!String.IsNullOrEmpty(toredundance) ? toredundance : paramList["host"])};");
+            if (paramList.ContainsKey("database")) result.Append($@"Database = {paramList["database"]};");
+            if (paramList.ContainsKey("user")) result.Append($@"User Id = {paramList["user"]};");
+            if (paramList.ContainsKey("user id")) result.Append($@"User Id = {paramList["user id"]};");
+            if (paramList.ContainsKey("username")) result.Append($@"User Id = {paramList["username"]};");
+            if (paramList.ContainsKey("password")) result.Append($@"Password = {paramList["password"]};");
+            if (paramList.ContainsKey("search path")) result.Append($@"Search Path = {paramList["search path"]};");
+            if (paramList.ContainsKey("port")) result.Append($@"Port = {paramList["port"]};"); else result.Append($@"Port = 5432;");
+            if (paramList.ContainsKey("commandtimeout")) result.Append($@"CommandTimeout = {paramList["commandtimeout"]};");
+            else
+            if (paramList.ContainsKey("command timeout")) result.Append($@"CommandTimeout = {paramList["command timeout"]};"); else result.Append($@"CommandTimeout = 300;");
+            if (paramList.ContainsKey("connectiontimeout")) result.Append($@"Timeout = {paramList["connectiontimeout"]};");
+            else
+            if (paramList.ContainsKey("connection timeout")) result.Append($@"Timeout = {paramList["connection timeout"]};");
+            else
+            if (paramList.ContainsKey("redundance")) result.Append($@"Timeout = 2;");
+            else result.Append($@"Timeout = 5;");
+            result.Append($@"SSLMode = Prefer;Trust Server Certificate = true");
+            return result.ToString();
+
+        }
+
+
+        private string buildPGConnectionString(string toredundance=null)
         {
-            //Server = localhost; User Id = postgres; Database = ADKU; Port = 5432; Password = 1; SSLMode = Prefer; Search Path = web; Connection type = PG
+            var paramList = parseConnectionString();
+            if (paramList.ContainsKey("remoteip")) _useremoteip = paramList["remoteip"];
+            if (paramList.ContainsKey("redundance")) _redundanceip = paramList["redundance"];
+            return buildPGConnectionStringStatic(paramList, toredundance);
+        }
+
+        /*private string buildPGConnectionString(string toredundance = null)
+        {
             StringBuilder result = new StringBuilder();
             var paramList = parseConnectionString();
-            if (paramList.ContainsKey("server")) result.Append($@"Server = {paramList["server"]};");
-            if (paramList.ContainsKey("host")) result.Append($@"Server = {paramList["host"]};");
+            if (paramList.ContainsKey("server")) result.Append($@"Server = {(!String.IsNullOrEmpty(toredundance)?toredundance:paramList["server"])};");
+            if (paramList.ContainsKey("host")) result.Append($@"Server = {(!String.IsNullOrEmpty(toredundance) ? toredundance : paramList["host"])};");
             if (paramList.ContainsKey("database")) result.Append($@"Database = {paramList["database"]};");
             if (paramList.ContainsKey("user")) result.Append($@"User Id = {paramList["user"]};");
             if (paramList.ContainsKey("user id")) result.Append($@"User Id = {paramList["user id"]};");
@@ -83,18 +118,38 @@ namespace adkuDBInterface
             if (paramList.ContainsKey("commandtimeout")) result.Append($@"CommandTimeout = {paramList["commandtimeout"]};"); else
             if (paramList.ContainsKey("command timeout")) result.Append($@"CommandTimeout = {paramList["command timeout"]};"); else result.Append($@"CommandTimeout = 300;");
             if (paramList.ContainsKey("connectiontimeout")) result.Append($@"Timeout = {paramList["connectiontimeout"]};"); else
-            if (paramList.ContainsKey("connection timeout")) result.Append($@"Timeout = {paramList["connection timeout"]};"); else result.Append($@"Timeout = 5;");
+            if (paramList.ContainsKey("connection timeout")) result.Append($@"Timeout = {paramList["connection timeout"]};"); else
+            if (paramList.ContainsKey("redundance")) result.Append($@"Timeout = 2;");
+            else result.Append($@"Timeout = 5;");
             result.Append($@"SSLMode = Prefer;Trust Server Certificate = true");
 
             if (paramList.ContainsKey("remoteip")) _useremoteip = paramList["remoteip"];
-
+            if (paramList.ContainsKey("redundance")) _redundanceip = paramList["redundance"];
             return result.ToString();
+        }*/
+
+
+        public static SortedList<string, string> parseConnectionStringStatic(string cs) {
+            SortedList<string, string> result = new SortedList<string, string>();
+            try
+            {
+                foreach (string param in cs.Split(';'))
+                {
+                    string[] arr = param.Split('=');
+                    if (arr.Length > 1 && !result.ContainsKey(arr[0].Trim().ToLower())) result.Add(arr[0].Trim().ToLower(), arr[1].Trim());
+                }
+            }
+            catch
+            {
+
+            }
+            return result;
+
         }
-
-
         private SortedList<string, string> parseConnectionString()
         {
-            SortedList<string, string> result = new SortedList<string, string>();
+            return parseConnectionStringStatic(_connectionString);
+            /*SortedList<string, string> result = new SortedList<string, string>();
             try
             {
                 foreach (string param in _connectionString.Split(';'))
@@ -107,7 +162,7 @@ namespace adkuDBInterface
             {
 
             }
-            return result;
+            return result;*/
         }
         private ConnectionTypes getConnectionType()
         {
@@ -428,7 +483,19 @@ namespace adkuDBInterface
                         //var start = DateTime.Now.ToOADate();
                         try
                         {
-                            await _pgConn.OpenAsync();
+                            try
+                            {
+                                await _pgConn.OpenAsync();
+                            }
+                            catch
+                            {
+                                if (!String.IsNullOrEmpty(_redundanceip))
+                                {
+                                    _pgConn.ConnectionString = buildPGConnectionString(_redundanceip);
+                                    await _pgConn.OpenAsync();
+                                }
+                            }
+
                             step = "opened";
                             var cmd = new NpgsqlCommand(query, _pgConn);
                             step = "command";
@@ -508,7 +575,18 @@ namespace adkuDBInterface
 
                         try
                         {
-                            _pgConn.Open();
+                            try
+                            {
+                                _pgConn.Open();
+                            }
+                            catch
+                            {
+                                if (!String.IsNullOrEmpty(_redundanceip))
+                                {
+                                    _pgConn.ConnectionString = buildPGConnectionString(_redundanceip);
+                                    _pgConn.Open();
+                                }
+                            }
 
                             var cmd = new NpgsqlCommand(query, _pgConn);
                             reader = cmd.ExecuteReader(CommandBehavior.CloseConnection);
@@ -683,7 +761,18 @@ namespace adkuDBInterface
 
                     try
                     {
-                        await _pgConn.OpenAsync();
+                        try
+                        {
+                            await _pgConn.OpenAsync();
+                        }
+                        catch
+                        {
+                            if (!String.IsNullOrEmpty(_redundanceip))
+                            {
+                                _pgConn.ConnectionString = buildPGConnectionString(_redundanceip);
+                                await _pgConn.OpenAsync();
+                            }
+                        }
                         step = "opened";
                         var cmd = new NpgsqlCommand(query, _pgConn);
                         step = "command";
@@ -717,7 +806,16 @@ namespace adkuDBInterface
 
                     try
                     {
-                        _pgConn.Open();
+                        try
+                        {
+                            _pgConn.Open();
+                        }
+                        catch {
+                            if (!String.IsNullOrEmpty(_redundanceip)) {
+                                _pgConn.ConnectionString = buildPGConnectionString(_redundanceip);
+                                _pgConn.Open();
+                            } 
+                        }
                         var cmd = new NpgsqlCommand(query, _pgConn);
                         cmd.CommandTimeout = 60;
                         cmd.ExecuteNonQuery();

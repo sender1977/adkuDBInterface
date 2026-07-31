@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using Npgsql;
+using System.Linq;
 using adkuDBInterface.Model;
 
 namespace adkuDBInterface.PG
@@ -10,6 +11,7 @@ namespace adkuDBInterface.PG
         // Внимание! для работы уведомлений необходимо чтобы в базе для соотв. таблицы был создан триггер с вызовом adku_nitify() (см alarm)
         string _cs;
         string _watchSQL;
+        string _redundanceip = "";
         bool _state = false;
         Thread _th;
         Thread _thWD;
@@ -65,19 +67,31 @@ namespace adkuDBInterface.PG
                     try
                     {
                         step = 1;
-                        using (var conn = new NpgsqlConnection(_cs))
+                        using (var conn = new NpgsqlConnection(buildConnectionString(_cs)))
                         {
                             step = 2;
-                            conn.Open();
+                            try
+                            {
+                                conn.Open();
+                            }
+                            catch (Exception e)
+                            {
+                                if (!String.IsNullOrEmpty(_redundanceip))
+                                {
+                                    conn.ConnectionString = buildConnectionString(_cs, _redundanceip);
+                                    conn.Open();
+                                }
+                                else throw new Exception("Нет связи " + e.Message);
+                            }
+                            
                             step = 3;
                             conn.Notification += NotificationSupportHelper;
                             step = 4;
-                            //Console.WriteLine("open");
+                            
 
                             using (var com = new NpgsqlCommand("listen adku;", conn))
                             {
                                 com.ExecuteNonQuery();
-
                             }
                             step = 5;
                             //Console.WriteLine("listen");
@@ -176,17 +190,32 @@ namespace adkuDBInterface.PG
             _thWD.Join();
         }
 
-        private string buildConnectionString(string instr) {
-            string result = "";
+        private string buildConnectionString(string instr, string red=null) {
+            var paramList = DBConnection<Enum>.parseConnectionStringStatic(instr);
+            bool hasTimeout = false;
+            foreach (var key in paramList.Keys.ToList<string>())
+                if (key.ToLower() == "commandtimeout" || key.ToLower() == "command timeout")
+                {
+                    paramList [key] = "3";
+                    hasTimeout = true;
+                }
+            if (!hasTimeout) paramList.Add("commandtimeout", "3");
+            return DBConnection<Enum>.buildPGConnectionStringStatic(paramList, red);
+
+/*            string result = "";
             string[] list = instr.Split(";");
             foreach (var elem in list)
-                if (!elem.ToLower().Contains("commandtimeout")) result = result + elem + ";";
-            return result + "; commandtimeout = 3;";
+                if (!elem.ToLower().Contains("commandtimeout") && !elem.ToLower().Contains("command timeout")) result = result + elem + ";";
+            return result + "; commandtimeout = 3;";*/
         }
 
         public PGDependency(string connectionString, string watchSQL)
         {
-            _cs = buildConnectionString(connectionString);
+            //_cs = buildConnectionString(connectionString);
+            _cs = connectionString;
+            var paramList = DBConnection<Enum>.parseConnectionStringStatic(_cs);
+            if (paramList.ContainsKey("redundance")) _redundanceip = paramList["redundance"];
+
             _watchSQL = watchSQL;
             _th = new Thread(Do);
             startListening();
